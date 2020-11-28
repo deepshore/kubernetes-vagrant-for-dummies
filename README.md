@@ -77,7 +77,7 @@ Check the status of the cluster nodes like this:
 ```bash
 kubectl get nodes 
 ```
-y
+
 ### Shutdown VMs
 
 Change to the vagrant folder and shutdown the nodes like this:
