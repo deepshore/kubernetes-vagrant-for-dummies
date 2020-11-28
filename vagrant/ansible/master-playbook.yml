@@ -1,0 +1,54 @@
+---
+- hosts: all
+  become: true
+  handlers:
+    - include: common-handlers.yml
+  tasks:
+    - name: Include common tasks
+      include_tasks: common-tasks.yml
+
+    - name: Configure kubectl
+      command: kubeadm init --apiserver-advertise-address="{{ k8s_master_apiserver_advertise_address }}" --apiserver-cert-extra-sans="{{ k8s_master_apiserver_advertise_address }}" --node-name="{{ k8s_master_node_name }}" --pod-network-cidr="{{ k8s_master_pod_network_cidr }}"
+      args:
+        creates: /etc/kubernetes/manifests/kube-apiserver.yaml
+
+    - name: Create .kube dir for vagrant user
+      file:
+        path: /home/vagrant/.kube
+        state: directory
+
+    - name: Copy kube config to .kube dir
+      copy:
+        src: /etc/kubernetes/admin.conf
+        dest:  /home/vagrant/.kube/config
+        remote_src: yes
+        owner: vagrant
+        group: vagrant
+        mode: 0660
+
+    - name: Install calico pod network
+      become: false
+      command: kubectl apply -f https://docs.projectcalico.org/v3.16/manifests/calico.yaml
+
+    - name: Generate join command
+      command: kubeadm token create --print-join-command
+      register: join_command
+
+    - name: Copy join command to local file
+      copy:
+        dest: join
+        content: "{{ join_command.stdout_lines[0] }}"
+      become: false
+      delegate_to: localhost
+
+    - name: Write .kube/config to register
+      command: cat /home/vagrant/.kube/config
+      register: cat_config_command
+
+    - name: Copy .kube/config from the register to local file
+      copy:
+        dest: "../../kubeconfig"
+        content: "{{ cat_config_command.stdout }}"
+        mode: 0600
+      become: false
+      delegate_to: localhost

@@ -1,0 +1,55 @@
+IMAGE_NAME = "bento/ubuntu-20.04"
+K8S_CLUSTER_NAME = "my-cluster"
+MASTERS_CPU = 2
+MASTERS_MEM = 2048
+
+NODES_NUM = 2
+NODES_CPU = 2
+NODES_MEM = 2048
+
+IP_BASE = "192.168.50"
+
+VAGRANT_DISABLE_VBOXSYMLINKCREATE=1
+
+Vagrant.configure("2") do |config|
+    config.ssh.insert_key = false
+
+    config.vm.define "master" do |master|
+        master.vm.box = IMAGE_NAME
+        master.vm.network "private_network", ip: "#{IP_BASE}.11"
+        master.vm.hostname = "master"
+        master.vm.provider "virtualbox" do |v|
+            v.memory = MASTERS_MEM
+            v.cpus = MASTERS_CPU
+        end
+        master.vm.provision "ansible" do |ansible|
+            ansible.playbook = "ansible/master-playbook.yml"
+            ansible.extra_vars = {
+                k8s_cluster_name: K8S_CLUSTER_NAME,
+                k8s_master_apiserver_advertise_address: "#{IP_BASE}.11",
+                k8s_master_pod_network_cidr: "192.168.112.0/20",
+                k8s_master_node_name: "master",
+                k8s_node_public_ip: "#{IP_BASE}.11"
+            }
+        end
+    end
+
+    (1..NODES_NUM).each do |i|
+        config.vm.define "node-#{i}" do |node|
+            node.vm.box = IMAGE_NAME
+            node.vm.network "private_network", ip: "#{IP_BASE}.#{i + 11}"
+            node.vm.hostname = "node-#{i}"
+            node.vm.provider "virtualbox" do |v|
+                v.memory = NODES_MEM
+                v.cpus = NODES_CPU
+            end
+            node.vm.provision "ansible" do |ansible|
+                ansible.playbook = "ansible/node-playbook.yml"
+                ansible.extra_vars = {
+                    k8s_cluster_name: K8S_CLUSTER_NAME,
+                    k8s_node_public_ip: "#{IP_BASE}.#{i + 11}"
+                }
+            end
+        end
+    end
+end

@@ -1,0 +1,18 @@
+---
+- hosts: all
+  become: true
+  handlers:
+  - include: common-handlers.yml
+  tasks:
+  - name: Include common tasks
+    include_tasks: common-tasks.yml
+
+  - name: Copy the join command to server location
+    copy:
+      src: "join"
+      dest: /tmp/join-command.sh
+      mode: 0777
+    become: false
+
+  - name: Join the node to cluster
+    command: sh /tmp/join-command.sh
